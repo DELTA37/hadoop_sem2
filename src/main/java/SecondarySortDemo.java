@@ -32,15 +32,22 @@ public class SecondarySortDemo extends Configured implements Tool {
     public static class MDStationPartitioner extends Partitioner<TextFloatPair, IntWritable> {
         @Override
         public int getPartition(TextFloatPair key, IntWritable val, int numPartitions) {
+            // Для каждой метеостанции в конкретный день месяца - отправляем на один reducer
             return Math.abs(key.getFirst().hashCode()) % numPartitions;
         }
     }
 
     public static class KeyComparator extends WritableComparator {
         protected KeyComparator() {
-            super(TextFloatPair.class, true);
+            super(TextFloatPair.class, true /* десериализовывать ли объекты (TextFloatPair) для compare */);
         }
 
+        /*
+         * Сортируем по полному ключу:
+         * - id метеостанции
+         * - день и месяц
+         * - если совпали - по убыванию температуры (см TextFloatPair.compareTo)
+         */
         @Override
         public int compare(WritableComparable a, WritableComparable b) {
             return ((TextFloatPair)a).compareTo((TextFloatPair)b);
@@ -54,6 +61,7 @@ public class SecondarySortDemo extends Configured implements Tool {
 
         @Override
         public int compare(WritableComparable a, WritableComparable b) {
+            // считаем за группу текстовую часть ключа: {id станции, день, месяц}
             Text a_first = ((TextFloatPair)a).getFirst();
             Text b_first = ((TextFloatPair)b).getFirst();
             return a_first.compareTo(b_first);
@@ -70,6 +78,10 @@ public class SecondarySortDemo extends Configured implements Tool {
             gsod.parseFrom(line);
 
             if (gsod.hasMaxTemp()) {
+                /*
+                 * Формируем композитный ключ специальной формы: <{id станции, день, месяц}, макс_температура_в_этот_день
+                 * В качестве значения используем год.
+                 */
                 String natural_key = String.format("%d:%02d.%02d", gsod.station, gsod.day, gsod.month);
                 TextFloatPair composite = new TextFloatPair(natural_key, gsod.max_temp);
                 context.write(composite, new IntWritable(gsod.year));
@@ -83,6 +95,12 @@ public class SecondarySortDemo extends Configured implements Tool {
 
     public static class TermalReducer extends Reducer<TextFloatPair, IntWritable, Text, Text> {
         @Override
+        /*
+         * Обратите внимание: мы не проходимся по values, а просто берем первый элемент.
+         * Mapreduce с помощью сортировки по композитному ключу уже все сделал за нас.
+         * А значит, в первом значении будет самая высокая температура этой метеостанции
+         *   за конкретный день конкретного месяца. выводим ее вместе с годом.
+         */
         protected void reduce(TextFloatPair key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
             int year = values.iterator().next().get();
             float temp = key.getSecond().get();
@@ -107,6 +125,7 @@ public class SecondarySortDemo extends Configured implements Tool {
         job.setSortComparatorClass(KeyComparator.class);
         job.setGroupingComparatorClass(MDStationGrouper.class);
 
+        // выход mapper-а != вывод reducer-а, поэтому ставим отдельно
         job.setMapOutputKeyClass(TextFloatPair.class);
         job.setMapOutputValueClass(IntWritable.class);
 

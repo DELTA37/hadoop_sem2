@@ -7,7 +7,7 @@
 
 # Запуск
 Для запуска запустите на кластере  
-``hadoop jar hadoop_sem2.jar SecondarySortDemo /data/seminar2/meteo/*.gz seminar2/out``
+``hadoop jar ./build/libs/hadoop_sem2.jar SecondarySortDemo /data/seminar2/meteo/*.gz seminar2/out``
 
 # Просмотр на Google Maps
 Чтобы визуализировать полученные результаты за определенный день на карте:  
