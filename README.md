@@ -5,3 +5,7 @@
 # Сборка и запуск
 Для всей демонстрации достаточно запустить `./run.sh`  
 Основной исходный файл: `src/main/java/SecondarySortDemo.java`
+
+
+# Визуализация
+Используйте полученный файл temps.kml в http://www.gpsvisualizer.com/
